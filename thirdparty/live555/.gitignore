@@ -1,0 +1,15 @@
+*.o
+*.a
+
+Makefile
+BasicUsageEnvironment/Makefile
+UsageEnvironment/Makefile
+groupsock/Makefile
+liveMedia/Makefile
+mediaServer/Makefile
+mediaServer/live555MediaServer
+proxyServer/Makefile
+proxyServer/live555ProxyServer
+testProgs/
+
+liveMedia/himpp/

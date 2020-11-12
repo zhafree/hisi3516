@@ -1,0 +1,145 @@
+//拿到开发板之后请按步骤执行以下操作
+1、打开网盘里面的规格说明书，查看接口线序图(主要是串口的)，找到电源线(8pin的口)和调试串口线(只需要3pin，即：GND TX RX)，对照规格书连接板子(注意：只需要接8pin的电源口和3pin的调试串口即可)；
+2、打开网盘分享的串口调试工具xshell(安装完后点击安装目录下的绿化.bat，会自动在桌面创建快捷方式，如提示缺少mfc110.dll库可自行百度搜索下载vs2012运行库)，配置好串口(波特率115200)，上电看到调试打印信息即可；
+3、板子默认的ip地址是：192.168.2.100，可以自行在/etc/init.d/rcS脚本里面修改，下次上电启动生效，或者手动输命令ifconfig修改，板子接上网线连接电源；
+4、默认已经开启了rtsp-h264测试程序(存放在/sys_app目录下)，再打开网盘分享的播放工具，输入流地址：rtsp://192.168.2.100:554/test.264，去掉tcp勾选，点击播放即可看到视频画面；
+5、常见问题：
+	5.1 上电之后没串口打印信息，对照规格书检查一下串口线序是否正确；
+	5.2 pc播放器看不到视频画面，板端用ps命令检查下rtsp-h264程序是否运行，如果没运行请手动运行，关闭电脑防火墙，由于防火墙的阻断会导致rtsp流无法传输到pc客户端；
+
+./configure \
+--enable-ffmpeg \
+--enable-static \
+--enable-gpl \
+--enable-small \
+--enable-sdl \
+--target-os=linux \
+--arch=arm \
+--enable-cross-compile \
+--cross-prefix=arm-himix200-linux- \
+--cc=arm-himix200-linux-gcc \
+--prefix=/opt/hisi-linux/x86-arm/arm-himix200-linux
+
+./configure --host=arm-himix200-linux --enable-static --disable-arm-simd --enable-alsa --disable-pulseaudio --enable-esd=no --prefix=/opt/hisi-linux/x86-arm/arm-himix200-linux
+
+/*********************************** hi3516dv300 ******************************************/
+(1)编译整个osdrv目录
+make all
+(2)单独编译kernel
+make ARCH=arm CROSS_COMPILE=arm-himix200-linux- menuconfig
+make ARCH=arm CROSS_COMPILE=arm-himix200-linux- uImage
+
+//制作烧录文件系统
+osdrv/pub/bin/pc/mkfs.jffs2 -d osdrv/pub/rootfs_uclibc_3516dv300 -l -e 0x10000 -o osdrv/pub/rootfs_hi3516dv300_64k.jffs2
+//128M 128K nand flash
+osdrv/pub/bin/pc/mkfs.jffs2 -d osdrv/pub/rootfs_uclibc_3516dv300 -l -n -e 0x20000 -o osdrv/pub/rootfs_hi3516dv300_128k.jffs2
+
+以 16M SPI nor Flash 为例
+1. 地址空间说明
+| 			1M 		   | 		  4M 		 | 			11M        | 
+|----------------------|---------------------|---------------------| 
+| 		boot 		   | 		kernel       | 		rootfs 		   | 
+以下的操作均基于图示的地址空间分配，您也可以根据实际情况进行调整。
+2. 烧写 u-boot 
+	mw.b 0x82000000 0xff 0x100000 
+	tftp 0x82000000 u-boot-hi3516dv300.bin 
+	sf probe 0;sf erase 0x0 0x100000;sf write 0x82000000 0x0 0x100000 
+3. 烧写内核
+	mw.b 0x82000000 0xff 0x400000 
+	tftp 0x82000000 uImage_hi3516dv300 
+	sf probe 0;sf erase 0x100000 0x400000;sf write 0x82000000 0x100000 0x400000 
+4. 烧写文件系统
+	mw.b 0x82000000 0xff 0xb00000 
+	tftp 0x82000000 rootfs_hi3516dv300_64k.jffs2 
+	sf probe 0;sf erase 0x500000 0xb00000;sf write 0x82000000 0x500000 0xb00000 
+5. 设置启动参数（注意 linux-4.9.y kernel 默认文件系统只读，需要在 bootargs 中加入
+rw 选项，文件系统才可读写）
+	setenv bootargs 'mem=128M console=ttyAMA0,115200 coherent_pool=2M root=/dev/mtdblock2 rootfstype=jffs2 rw mtdparts=hi_sfc:1M(boot),4M(kernel),11M(rootfs)' 
+	setenv bootcmd 'sf probe 0;sf read 0x82000000 0x100000 0x400000;bootm 0x82000000' 
+	saveenv 
+6. 重启系统
+	reset
+
+以 32M SPI nor Flash 为例
+1. 地址空间说明
+| 			1M 		   | 		  4M 		 | 			27M        | 
+|----------------------|---------------------|---------------------| 
+| 		boot 		   | 		kernel       | 		rootfs 		   | 
+以下的操作均基于图示的地址空间分配，您也可以根据实际情况进行调整。
+2. 烧写 u-boot 
+	mw.b 0x82000000 0xff 0x100000 
+	tftp 0x82000000 u-boot-hi3516dv300.bin 
+	sf probe 0;sf erase 0x0 0x100000;sf write 0x82000000 0x0 0x100000 
+3. 烧写内核
+	mw.b 0x82000000 0xff 0x400000 
+	tftp 0x82000000 uImage_hi3516dv300 
+	sf probe 0;sf erase 0x100000 0x400000;sf write 0x82000000 0x100000 0x400000 
+4. 烧写文件系统
+	mw.b 0x82000000 0xff 0x1b00000 
+	tftp 0x82000000 rootfs_hi3516dv300_64k.jffs2 
+	sf probe 0;sf erase 0x500000 0x1b00000;sf write 0x82000000 0x500000 0x1b00000 
+5. 设置启动参数（注意 linux-4.9.y kernel 默认文件系统只读，需要在 bootargs 中加入
+rw 选项，文件系统才可读写）
+	setenv bootargs 'mem=128M console=ttyAMA0,115200 coherent_pool=2M root=/dev/mtdblock2 rootfstype=jffs2 rw mtdparts=hi_sfc:1M(boot),4M(kernel),27M(rootfs)' 
+	setenv bootcmd 'sf probe 0;sf read 0x82000000 0x100000 0x400000;bootm 0x82000000' 
+	saveenv 
+6. 重启系统
+	reset
+
+以 128M SPI NAND Flash 为例
+1. 地址空间说明
+| 			1M 		   | 		  4M 		 | 		  123M         | 
+|----------------------|---------------------|---------------------| 
+| 		boot 		   | 		kernel       | 		rootfs 		   | 
+以下的操作均基于图示的地址空间分配，您也可以根据实际情况进行调整。
+2. 烧写 u-boot 
+	mw.b 0x82000000 0xff 0x100000 
+	tftp 0x82000000 u-boot-hi3516dv300.bin 
+	nand probe 0;nand erase 0x0 0x100000;
+	nand write 0x82000000 0x0 0x100000 
+3. 烧写内核
+	mw.b 0x82000000 0xff 0x400000 
+	tftp 0x82000000 uImage_hi3516dv300 
+	nand erase 0x100000 0x400000;
+	nand write 0x82000000 0x100000 0x400000 
+4. 烧写文件系统 
+	tftp 0x82000000 rootfs_hi3516dv300_128k.jffs2 
+	nand erase 0x500000 0x7b00000;
+	nand write 0x82000000 0x500000 0x746488 
+5. 设置启动参数（注意 linux-4.9.y kernel 默认文件系统只读，需要在 bootargs 中加入
+rw 选项，文件系统才可读写）
+	setenv bootargs 'mem=128M console=ttyAMA0,115200 coherent_pool=2M root=/dev/mtdblock2 rootfstype=jffs2 rw mtdparts=hinand:1M(boot),4M(kernel),123M(rootfs)' 
+	setenv bootcmd 'nand read 0x82000000 0x100000 0x400000;bootm 0x82000000' 
+	saveenv 
+6. 重启系统
+	reset
+
+./load3516dv300 -i -sensor0 imx327 -osmem 128M
+
+以 128M SPI NAND Flash 为例
+1. 地址空间说明
+| 			1M 		   | 		  4M 		 | 		  123M         | 
+|----------------------|---------------------|---------------------| 
+| 		boot 		   | 		kernel       | 		rootfs 		   | 
+以下的操作均基于图示的地址空间分配，您也可以根据实际情况进行调整。
+2. 烧写 u-boot 
+	mw.b 0x82000000 0xff 0x100000 
+	tftp 0x82000000 u-boot-hi3516dv300.bin 
+	nand probe 0;nand erase 0x0 0x100000;nand write 0x82000000 0x0 0x100000 
+3. 烧写内核
+	mw.b 0x82000000 0xff 0x400000 
+	tftp 0x82000000 uImage_hi3516dv300
+	nand erase 0x100000 0x400000;
+	nand write 0x82000000 0x100000 0x400000 
+4. 烧写文件系统
+	mw.b 0x82000000 0xff 0x7b00000
+	tftp 0x82000000 rootfs_uclibc_3516dv300_2k_4bit_327.yaffs2
+	nand erase 0x500000 0x7b00000;
+	nand write.yaffs 0x82000000 0x500000 10A1840
+5. 设置启动参数（注意 linux-4.9.y kernel 默认文件系统只读，需要在 bootargs 中加入
+rw 选项，文件系统才可读写）
+	setenv bootargs 'mem=128M console=ttyAMA0,115200 coherent_pool=2M root=/dev/mtdblock2 rootfstype=yaffs2 rw mtdparts=hinand:1M(boot),4M(kernel),123M(rootfs)' 
+	setenv bootcmd 'nand read 0x82000000 0x100000 0x400000;bootm 0x82000000' 
+	saveenv 
+6. 重启系统
+	reset

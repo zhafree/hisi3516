@@ -1,0 +1,62 @@
+##### End of variables to change
+
+MEDIA_SERVER = live555MediaServer$(EXE)
+
+PREFIX = /usr/local
+ALL = $(MEDIA_SERVER)
+all: $(ALL)
+
+.$(C).$(OBJ):
+	$(C_COMPILER) -c $(C_FLAGS) $<
+.$(CPP).$(OBJ):
+	$(CPLUSPLUS_COMPILER) -c $(CPLUSPLUS_FLAGS) $<
+
+MEDIA_SERVER_OBJS = live555MediaServer.$(OBJ) DynamicRTSPServer.$(OBJ)
+
+live555MediaServer.$(CPP):	DynamicRTSPServer.hh version.hh
+DynamicRTSPServer.$(CPP):	DynamicRTSPServer.hh
+
+USAGE_ENVIRONMENT_DIR = ../UsageEnvironment
+USAGE_ENVIRONMENT_LIB = $(USAGE_ENVIRONMENT_DIR)/libUsageEnvironment.$(libUsageEnvironment_LIB_SUFFIX)
+BASIC_USAGE_ENVIRONMENT_DIR = ../BasicUsageEnvironment
+BASIC_USAGE_ENVIRONMENT_LIB = $(BASIC_USAGE_ENVIRONMENT_DIR)/libBasicUsageEnvironment.$(libBasicUsageEnvironment_LIB_SUFFIX)
+LIVEMEDIA_DIR = ../liveMedia
+LIVEMEDIA_LIB = $(LIVEMEDIA_DIR)/libliveMedia.$(libliveMedia_LIB_SUFFIX)
+GROUPSOCK_DIR = ../groupsock
+GROUPSOCK_LIB = $(GROUPSOCK_DIR)/libgroupsock.$(libgroupsock_LIB_SUFFIX)
+
+HIMPP_DIR = ../liveMedia/himpp/lib
+HIMPP_LIBS = $(HIMPP_DIR)/libhimpp.a \
+			$(HIMPP_DIR)/libmpi.a \
+			$(HIMPP_DIR)/lib_hiae.a \
+			$(HIMPP_DIR)/libisp.a \
+			$(HIMPP_DIR)/lib_hiawb.a \
+			$(HIMPP_DIR)/libhi_cipher.a \
+			$(HIMPP_DIR)/libVoiceEngine.a \
+			$(HIMPP_DIR)/libupvqe.a \
+			$(HIMPP_DIR)/libdnvqe.a \
+			$(HIMPP_DIR)/libive.a \
+			$(HIMPP_DIR)/libmd.a \
+			$(HIMPP_DIR)/libsecurec.a \
+			$(HIMPP_DIR)/lib_hidrc.a \
+			$(HIMPP_DIR)/lib_hildci.a \
+			$(HIMPP_DIR)/lib_hidehaze.a \
+			$(HIMPP_DIR)/libhdmi.a \
+			$(HIMPP_DIR)/libsns_imx327.a \
+			$(HIMPP_DIR)/libsns_imx327_2l.a
+
+LOCAL_LIBS =	$(LIVEMEDIA_LIB) $(GROUPSOCK_LIB) \
+		$(BASIC_USAGE_ENVIRONMENT_LIB) $(USAGE_ENVIRONMENT_LIB)
+LIBS =			$(LOCAL_LIBS) $(LIBS_FOR_CONSOLE_APPLICATION) $(HIMPP_LIBS) -lpthread -ldl
+
+live555MediaServer$(EXE):	$(MEDIA_SERVER_OBJS) $(LOCAL_LIBS)
+	$(LINK)$@ $(CONSOLE_LINK_OPTS) $(MEDIA_SERVER_OBJS) $(LIBS)
+
+clean:
+	-rm -rf *.$(OBJ) $(ALL) core *.core *~ include/*~
+
+install: $(MEDIA_SERVER)
+	  install -d $(DESTDIR)$(PREFIX)/bin
+	  install -m 755 $(MEDIA_SERVER) $(DESTDIR)$(PREFIX)/bin
+
+##### Any additional, platform-specific rules come here:
